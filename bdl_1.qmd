@@ -1,0 +1,39 @@
+---
+title: "Tests of BDL Bias and Variance"
+author:
+  - name: James R. Hunter, D.Sc.
+    affiliation: Laboratório de Retrovirologia, UNIFESP
+date: last-modified
+
+format: 
+  typst: 
+    mainfont: "Nunito"
+    fontsize: 11pt
+
+editor: visual
+
+execute:
+  echo: false
+  warning: false
+  message: false
+bibliography: references.bib
+---
+
+## Purpose
+
+This file will test the determination of bias and variance when calculating viral loads and other variables that are subject to detection limits. For HIV-1 patients, the objective of antiretroviral treatment is the make their plasma RNA viral load zero.
+
+However, there is a practical limit below which the assays cannot distinguish between the presence of virus and having no virus (the zero objective). This is called the "detection limit" and patients who achieve this level are said to have a viral load "BDL", below detection limit. One of the most important consequences of exactitude in measuring true lack of the presence of virus is the phrase "undetectable = untransmittable" [@chang2025][@combescure2009]. This frees, at least emotionally, the individual from concern about transmitting the virus to a partner.
+
+There have been various strategies to deal with calculations of viral load in a panel of patients. One has been to eliminate the cases from the calculation, another has been to treat the viral level of those patients who are BDL as 0, assuming they are really without any virus. Still another strategy has been to assign a value equal to the detection limit. Others have used a value of half the detection limit, i.e., half of the difference between the detection limit and zero.
+
+| Name   | Strategy                         | Value Assigned to "BDL" |
+|--------|----------------------------------|-------------------------|
+| censor | eliminate case                   | no value                |
+| zero   | treat as zero                    | 0                       |
+| dl     | treat as detection limit         | detection limit         |
+| halfdl | treat as half of detection limit | detection limit/2       |
+
+## Method
+
+I will create an artificial panel of patients and track their RNA viral load through 4 time periods: baseline, 3 months, 6 months, and 1 year. I will assume that patients achieve viral loads BDL randomly based on the following table, which shows what percentage of patients achieve BDL in a given period after starting ART. This table is approximately drawn from the literature on clinical trials of HIV-1 drugs, especially integrase inhibitors, the backbone of modern treatment schemes. The references cited here are illustrative and have been consulted to give some weight to the estimates in the table. [@lennox2009][@gallant2017]
