@@ -1,0 +1,60 @@
+---
+title: "What % Achieve BDL"
+
+format: 
+  typst: 
+    mainfont: "Nunito"
+    fontsize: 11pt
+
+editor: visual
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Google Gemini Pro 3
+
+## Prompt
+
+*What percentage of treatment naive HIV-1 patients who go on anti-retroviral therapy achieve 0 or below detection limit RNA viral load in 3 months, 6months, 1 year? Can you give me references for this as well?*
+
+## Response
+
+Here is an overview of viral suppression rates in treatment-naive HIV-1 patients starting antiretroviral therapy (ART).
+
+It is important to note that modern ART regimens, particularly those containing Integrase Strand Transfer Inhibitors (INSTIs), achieve viral suppression much faster than older regimens. Therefore, data varies slightly depending on whether you look at historical studies or trials involving modern first-line treatments like Dolutegravir or Bictegravir.
+
+### General Expectations for Viral Suppression
+
+The goal of ART is to reach an undetectable viral load (usually defined as \<50 copies/mL).
+
+-   **3 Months:** Approximately **60–85%** of patients achieve suppression.
+    -   Rapid suppression is highly dependent on the baseline viral load (patients with extremely high viral loads take longer) and the potency of the regimen (INSTIs are faster than NNRTIs or Protease Inhibitors).
+-   **6 Months:** Approximately **85–90%** of patients achieve suppression.
+-   **1 Year (48 Weeks):** Approximately **90–95%** of patients achieve suppression in clinical trial settings (intention-to-treat analyses often show slightly lower numbers due to missing data being counted as failure, but "on-treatment" analyses are consistently in the high 90s).
+
+### Detailed Breakdown by Timeframe with References
+
+#### 1. At 3 Months (approx. 12 Weeks)
+
+Modern integrase inhibitors reduce viral load very quickly. \* **Data Point:** In trials comparing Dolutegravir (an INSTI) to Efavirenz (an NNRTI), Dolutegravir showed significantly faster suppression. By week 4, nearly 65% of the Dolutegravir group was suppressed, rising well above 80-85% by week 12. \* **Reference:** Walmsley SL, et al. *Dolutegravir plus abacavir–lamivudine for the treatment of HIV-1 infection.* **N Engl J Med.** 2013;369(19):1807-1818. (The SINGLE Trial).
+
+#### 2. At 6 Months (approx. 24 Weeks)
+
+By this point, the vast majority of adherent patients on modern therapy should be undetectable. \* **Data Point:** In the STARTMRK trial (comparing Raltegravir vs. Efavirenz), 89% of patients on Raltegravir achieved \<50 copies/mL by week 24, compared to 82% in the Efavirenz group. \* **Reference:** Lennox JL, et al. *Safety and efficacy of raltegravir-based versus efavirenz-based combination therapy in treatment-naive patients with HIV-1 infection: a multicentre, double-blind randomised controlled trial.* **The Lancet.** 2009;374(9692):796-806.
+
+#### 3. At 1 Year (48 Weeks)
+
+This is the standard endpoint for most major Phase 3 clinical trials. High suppression rates here are the benchmark for approval. \* **Data Point:** In pooled analyses of studies utilizing Bictegravir/Emtricitabine/Tenofovir Alafenamide (Biktarvy), viral suppression (\<50 copies/mL) at Week 48 was achieved by **92.4%** of participants. \* **Reference:** Gallant J, et al. *Bictegravir, emtricitabine, and tenofovir alafenamide versus dolutegravir, abacavir, and lamivudine for initial treatment of HIV-1 infection (GS-US-380-1489): a double-blind, multicentre, phase 3, randomised controlled non-inferiority trial.* **The Lancet.** 2017;390(10107):2063-2072.
+
+### Summary Table (Modern Regimens)
+
+| Timeframe | Estimated % Undetectable (\<50 copies/mL) | Key Factor |
+|:---|:---|:---|
+| **3 Months** | \~75% – 85% | Highly dependent on baseline viral load. |
+| **6 Months** | \~85% – 90% | Most patients achieve suppression here. |
+| **1 Year** | \~90% – 95% | Standard benchmark for success. |
+
+***Disclaimer:** I am an AI assistant and not a doctor. This information is based on clinical trial data and should not replace professional medical advice. Individual results vary based on adherence, drug resistance, and baseline health.*
