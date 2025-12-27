@@ -37,3 +37,10 @@ There have been various strategies to deal with calculations of viral load in a 
 ## Method
 
 I will create an artificial panel of patients and track their RNA viral load through 4 time periods: baseline, 3 months, 6 months, and 1 year. I will assume that patients achieve viral loads BDL randomly based on the following table, which shows what percentage of patients achieve BDL in a given period after starting ART. This table is approximately drawn from the literature on clinical trials of HIV-1 drugs, especially integrase inhibitors, the backbone of modern treatment schemes. The references cited here are illustrative and have been consulted to give some weight to the estimates in the table. [@lennox2009][@gallant2017]
+
+| Time          | Cumulative % Achieving BDL                          |
+|---------------|-----------------------------------------------------|
+| Baseline (BL) | 0%                                                  |
+| 3 months      | 75% - 85% (higher BL load implies lower percentage) |
+| 6 months      | 85% - 90%                                           |
+| 1 year        | 90% - 95%                                           |
