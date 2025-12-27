@@ -42,4 +42,10 @@ What is the relationship between the true value of viral load below detection li
 
 ## Method
 
-I will create a panel of 1,000 PLWH artificially with estimates of their viral load at a baseline and after 6 simulated months of antiretroviral treatment (ART).
+I will create a panel of 1,000 PLWH artificially with estimates of their viral load at a baseline and after 48 simulated weeks of antiretroviral treatment (ART) when their viral load will have reduced to BDL, which I will define here as 50 copies per mL.[^1] According to a 2009 clinical trial (STARTMRK) of Raltegravir, a 1st generation integrase inhibitor, 86.1% of the RTG arm of naive patients had viral loads BDL by week 48. [@lennox2009] Likewise, a clinical trial (SINGLE) of a second generation integrase inhibitor, Dolutagravir, showed 88% of the DTG arm with viral loads below detection limit by week 48. [@walmsley2013] For my panel, I will use a proportion of 85% of patients achieving true viral loads between 0 and 50 by the 48 week mark. 85% is a bit more conservative than either of the real trials, but consistent with their results.
+
+[^1]: While 50 copies was a common level for detection limit until 2024, since then it has been reduced to 30 or 20 copies depending on the measurement technology used. I am using 50 here as the purpose is to explore the bias and variance of samples rather than to test the detection limit itself.
+
+The baseline viral loads will be determined by calculating 1,000 normal variates (the result of applying a normal distribution) with a mean of 32,000 copies per mL and a standard deviation of 150,000 copies. These values are estimated based on the Code Pharma Phase IIA trial of our lab (data not yet published).
+
+The 48 week data will be
