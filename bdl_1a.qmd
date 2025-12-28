@@ -34,6 +34,8 @@ There have been various strategies to deal with calculations of viral load in a 
 | dl     | treat as detection limit         | detection limit         |
 | halfdl | treat as half of detection limit | detection limit/2       |
 
+: Table 1: Strategies for Handling BDL Values
+
 This study was inspired by a blog post by Nikolas Siccha, "Lower Limits of Detection or Quantification".[@siccha2025] He develops a Bayesian model to explore the pharmacodynamics of drugs that cause the measurement of interest to fall below detection limits. As it deals with the dynamics over time of a drug's presence and efficacy in a patient, his question is more complex than the question I would like to address here.
 
 ::: callout-important
@@ -46,6 +48,43 @@ I will create a panel of 1,000 PLWH artificially with estimates of their viral l
 
 [^1]: While 50 copies was a common level for detection limit until 2024, since then it has been reduced to 30 or 20 copies depending on the measurement technology used. I am using 50 here as the purpose is to explore the bias and variance of samples rather than to test the detection limit itself.
 
-The baseline viral loads will be determined by calculating 1,000 normal variates (the result of applying a normal distribution) with a mean of 32,000 copies per mL and a standard deviation of 150,000 copies. These values are estimated based on the Code Pharma Phase IIA trial of our lab (data not yet published).
+The baseline viral loads will be determined by calculating 1,000 normal variates from a truncated normal distribution with a mean of 40,0000 copies per mL and a standard deviation of 42,000 copies. These values are estimated based on the Code Pharma Phase IIA trial of our lab (data not yet published). Since values below detection limit make no sense for this simulation, these values will be removed by using the truncated normal distribution.[@mersmann2023] By cutting off the negative values produced by the original calculation, the mean and standard deviation of the final set will be higher than the estimate from the Code Pharma clinical trial.
 
-The 48 week data will be
+The 48 week data will be reduced by 92% and the number of values below 50 copies per mL will be calculated. I will then create a second version substituting the true values below the detection limit with BDL. Using the four strategies outlined in Table 1, I will then compare the bias and variance of each of these strategies for substituting the true value of the viral load. Finally, I will propose a method for imputing values that is commonly applied in studies using the R statistical language.
+
+The flow chart below shows a schematic of the workflow of this study.
+
+```{r}
+
+#| label: determine_cohort_bl
+#| echo: false
+
+pacman::p_load(tidyverse, janitor, ggpubr, ggsci)
+palettes <- readRDS("/Users/jameshunter/Documents/R/jim_palettes.rds")
+stats <- c("mean", "sd", "min", "med", "max", "iqr", "cv")
+
+set.seed(42)
+## assumed values
+n <- 1000
+blmean <- 40000
+blsd <- 42000
+reduct_pct <- .92
+dl <- 50
+
+# calculate baseline distribution
+bl <- truncnorm::rtruncnorm(n, mean = blmean, sd = blsd, a = dl)
+
+# calculate summary stats
+summarytools::descr(bl, stats = stats)
+
+bldf <- as.data.frame(bl)
+bldf |> 
+  gghistogram(x = "bl",
+              bins = 20,
+              fill = palettes$jim_palette_1[1],
+              title = "Viral Load Baseline Values - Simulated",
+              xlab = "Viral Load",
+              ggtheme = theme_bw())
+```
+
+The histogram shows that the viral loads for the cases are typically right-skewed, mirroring many studies of initial viral loads.
