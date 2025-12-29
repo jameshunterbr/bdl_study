@@ -42,37 +42,53 @@ This study was inspired by a blog post by Nikolas Siccha, "Lower Limits of Detec
 What is the relationship between the true value of viral load below detection limit and the strategies used to estimate it and how does that effect analyses of the viral load of a sample or population?
 :::
 
+```{r}
+
+#| label: packages_variables
+
+#| echo: false
+
+pacman::p_load(tidyverse, janitor, ggpubr, ggsci, gt)
+palettes <- readRDS("/Users/jameshunter/Documents/R/jim_palettes.rds")
+stats <- c("mean", "sd", "min", "med", "max", "iqr", "cv")
+
+## assumed values
+n <- 1000
+blmean <- 900
+blsd <- 1000
+reduct_pct <- .975 # pct reduction in w48
+dl <- 50 # detection limit
+
+```
+
 ## Method
 
-I will create a panel of 1,000 PLWH artificially with estimates of their viral load at a baseline and after 48 simulated weeks of antiretroviral treatment (ART) when their viral load will have reduced to BDL, which I will define here as 50 copies per mL.[^1] According to a 2009 clinical trial (STARTMRK) of Raltegravir, a 1st generation integrase inhibitor, 86.1% of the RTG arm of naive patients had viral loads BDL by week 48. [@lennox2009] Likewise, a clinical trial (SINGLE) of a second generation integrase inhibitor, Dolutagravir, showed 88% of the DTG arm with viral loads below detection limit by week 48. [@walmsley2013] For my panel, I will use a proportion of 85% of patients achieving true viral loads between 0 and 50 by the 48 week mark. 85% is a bit more conservative than either of the real trials, but consistent with their results.
+I will create a panel of 1,000 PLWH artificially with estimates of their viral load at a baseline and after 48 simulated weeks of antiretroviral treatment (ART) when some of them will have viral loads reduced to BDL, which I will define here as 50 copies per mL.[^1] According to a 2009 clinical trial (STARTMRK) of Raltegravir, a 1st generation integrase inhibitor, 86.1% of the RTG arm of naive patients had viral loads BDL by week 48. [@lennox2009] Likewise, a clinical trial (SINGLE) of a second generation integrase inhibitor, Dolutagravir, showed 88% of the DTG arm with viral loads below detection limit by week 48. [@walmsley2013] For my panel, I will use a proportion of 85% of patients achieving true viral loads between 0 and 50 by the 48 week mark. 85% is a bit more conservative than either of the real trials, but consistent with their results.
 
 [^1]: While 50 copies was a common level for detection limit until 2024, since then it has been reduced to 30 or 20 copies depending on the measurement technology used. I am using 50 here as the purpose is to explore the bias and variance of samples rather than to test the detection limit itself.
 
-The baseline viral loads will be determined by calculating 1,000 normal variates from a truncated normal distribution with a mean of 40,0000 copies per mL and a standard deviation of 42,000 copies. These values are estimated based on the Code Pharma Phase IIA trial of our lab (data not yet published). Since values below detection limit make no sense for this simulation, these values will be removed by using the truncated normal distribution.[@mersmann2023] By cutting off the negative values produced by the original calculation, the mean and standard deviation of the final set will be higher than the estimate from the Code Pharma clinical trial.
+The baseline viral loads will be determined by calculating 1,000 normal variates from a truncated normal distribution with a mean of `r format(blmean, big.mark = ",")` copies per mL and a standard deviation of `r format(blsd, big.mark = ",")` copies. Since values below detection limit make no sense for this simulation, these values will be removed by using the truncated normal distribution.[@mersmann2023]
 
-The 48 week data will be reduced by 92% and the number of values below 50 copies per mL will be calculated. I will then create a second version substituting the true values below the detection limit with BDL. Using the four strategies outlined in Table 1, I will then compare the bias and variance of each of these strategies for substituting the true value of the viral load. Finally, I will propose a method for imputing values that is commonly applied in studies using the R statistical language.
+The 48 week data will be reduced dramatically (and unrealistically)[^2] by `r 100 * reduct_pct`% and the number of values below 50 copies per mL will be calculated. I will then create a second version substituting the true values below the detection limit with BDL. Using the four strategies outlined in Table 1, I will then compare the bias and variance of each of these strategies for substituting the true value of the viral load. Finally, I will propose a method for imputing values that is commonly applied in studies using the R statistical language.
+
+[^2]: While unrealistic, this large reduction is useful to give us a number of values BDL that can be tested against the 4 strategies.
 
 The flow chart below shows a schematic of the workflow of this study.
+
+![](flowchart%20bdl.png){fig-align="center" width="3.1in"}
+
+## Baseline
 
 ```{r}
 
 #| label: determine_cohort_bl
 #| echo: false
 
-pacman::p_load(tidyverse, janitor, ggpubr, ggsci)
-palettes <- readRDS("/Users/jameshunter/Documents/R/jim_palettes.rds")
-stats <- c("mean", "sd", "min", "med", "max", "iqr", "cv")
-
 set.seed(42)
-## assumed values
-n <- 1000
-blmean <- 40000
-blsd <- 42000
-reduct_pct <- .92
-dl <- 50
 
 # calculate baseline distribution
-bl <- truncnorm::rtruncnorm(n, mean = blmean, sd = blsd, a = dl)
+# set as integer
+bl <- round(truncnorm::rtruncnorm(n, mean = blmean, sd = blsd, a = dl), 0)
 
 # calculate summary stats
 summarytools::descr(bl, stats = stats)
@@ -83,8 +99,75 @@ bldf |>
               bins = 20,
               fill = palettes$jim_palette_1[1],
               title = "Viral Load Baseline Values - Simulated",
+              add = "mean",
+              add.params = list(color = palettes$jim_palette_1[2], size = 2),
               xlab = "Viral Load",
-              ggtheme = theme_bw())
+              ylab = "Count",
+              ggtheme = theme_bw()) +
+  annotate("text", x = 1800, y = 125, label = "Mean of Viral Loads", 
+           color = palettes$jim_palette_1[2])
 ```
 
-The histogram shows that the viral loads for the cases are typically right-skewed, mirroring many studies of initial viral loads.
+## Week 48 Viral Load
+
+We will calculate the viral load at 48 weeks to be `r 100 * reduct_pct`% less than the original viral load.
+
+```{r}
+
+#| label: 48_weeks
+
+bldf <- bldf |> 
+  mutate(w48 = round(bl * (1 - reduct_pct), 0))
+
+num_vals_bdl <- length(bldf$w48[bldf$w48 < 50])
+
+# substitute "bdl" for values less than 50
+bldf <- bldf |>
+  mutate(w48_bdl = ifelse(w48 < 50, "bdl", w48))
+
+summarytools::descr(bldf$w48, stats = stats)
+
+bldf |> 
+  gghistogram(x = "w48",
+              bins = 20,
+              fill = palettes$jim_palette_1[1],
+              title = "Viral Load Week 48 Values",
+              add = "mean",
+              add.params = list(color = palettes$jim_palette_1[2], size = 2),
+              xlab = "Viral Load",
+              ylab = "Count",
+              ggtheme = theme_bw()) +
+  annotate("text", x = 50, y = 110, label = "Mean of Viral Loads", 
+           color = palettes$jim_palette_1[2])
+
+truewk48 <- bldf |> 
+  summarise(mean_wk48 = mean(w48),
+            sd_wk48 = sd(w48),
+            med_wk48 = median(w48),
+            num_bdl = sum(w48 < 50))
+```
+
+To give you an idea of what we have now, here are the first 10 cases in our dataset. While we know the true values of the viral load, the assay itself will only give us a BDL signal instead of the value. This occurs `r num_vals_bdl` times out of the 1,000 cases. The question is what can we do about it and what does that do to the distribution of viral loads that we are trying to use to make an inference about HIV-1 treatment strategies.
+
+```{r}
+
+#| data_table
+#| echo: false
+
+bldf |> 
+  slice(1:10) |> 
+  gt() |> 
+  fmt_number(
+    decimals = 0
+  ) |> 
+  cols_label(
+    bl = "Baseline",
+    w48 = "True Value",
+    w48_bdl = "BDL"
+  ) |> 
+  tab_spanner(
+    label = "Week 48",
+    columns = c(w48, w48_bdl)
+  )
+
+```
