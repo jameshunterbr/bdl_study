@@ -48,7 +48,7 @@ What is the relationship between the true value of viral load below detection li
 
 #| echo: false
 
-pacman::p_load(tidyverse, janitor, ggpubr, ggsci, gt)
+pacman::p_load(tidyverse, janitor, ggpubr, ggsci, gt, summarytools)
 palettes <- readRDS("/Users/jameshunter/Documents/R/jim_palettes.rds")
 stats <- c("mean", "sd", "min", "med", "max", "iqr", "cv")
 
@@ -91,10 +91,10 @@ set.seed(42)
 bl <- round(truncnorm::rtruncnorm(n, mean = blmean, sd = blsd, a = dl), 0)
 
 # calculate summary stats
-summarytools::descr(bl, stats = stats)
+descr(bl, stats = stats)
 
-bldf <- as.data.frame(bl)
-bldf |> 
+vldf <- tibble(bl)
+vldf |> 
   gghistogram(x = "bl",
               bins = 20,
               fill = palettes$jim_palette_1[1],
@@ -116,18 +116,18 @@ We will calculate the viral load at 48 weeks to be `r 100 * reduct_pct`% less th
 
 #| label: 48_weeks
 
-bldf <- bldf |> 
+vldf <- vldf |> 
   mutate(w48 = round(bl * (1 - reduct_pct), 0))
 
-num_vals_bdl <- length(bldf$w48[bldf$w48 < 50])
+num_vals_bdl <- length(vldf$w48[vldf$w48 < 50])
 
 # substitute "bdl" for values less than 50
-bldf <- bldf |>
+vldf <- vldf |>
   mutate(w48_bdl = ifelse(w48 < 50, "bdl", w48))
 
-summarytools::descr(bldf$w48, stats = stats)
+descr(vldf$w48, stats = stats)
 
-bldf |> 
+vldf |> 
   gghistogram(x = "w48",
               bins = 20,
               fill = palettes$jim_palette_1[1],
@@ -139,12 +139,15 @@ bldf |>
               ggtheme = theme_bw()) +
   annotate("text", x = 50, y = 110, label = "Mean of Viral Loads", 
            color = palettes$jim_palette_1[2])
-
-truewk48 <- bldf |> 
-  summarise(mean_wk48 = mean(w48),
-            sd_wk48 = sd(w48),
-            med_wk48 = median(w48),
-            num_bdl = sum(w48 < 50))
+# tibble to compare true values with strategies
+wk48_compare <- vldf |> 
+  summarise(
+    strategy = "true",
+    mean_wk48 = mean(w48),
+    sd_wk48 = sd(w48),
+    var_wk48 = sd_wk48^2,
+    med_wk48 = median(w48),
+    num = n())
 ```
 
 To give you an idea of what we have now, here are the first 10 cases in our dataset. While we know the true values of the viral load, the assay itself will only give us a BDL signal instead of the value. This occurs `r num_vals_bdl` times out of the 1,000 cases. The question is what can we do about it and what does that do to the distribution of viral loads that we are trying to use to make an inference about HIV-1 treatment strategies.
@@ -154,7 +157,7 @@ To give you an idea of what we have now, here are the first 10 cases in our data
 #| data_table
 #| echo: false
 
-bldf |> 
+vldf |> 
   slice(1:10) |> 
   gt() |> 
   fmt_number(
@@ -169,5 +172,56 @@ bldf |>
     label = "Week 48",
     columns = c(w48, w48_bdl)
   )
+
+# store number of bdl's for text below
+numbdl <- length(vldf$w48_bdl[vldf$w48_bdl == "bdl"])
+```
+
+## Bias and Variance
+
+The measures I am going to use to test the strategies listed at the beginning of this analysis are bias and variance. Bias measures how much the strategy distorts the distribution of true values. I will show this by comparing the mean, median, and standard deviation of the results of the strategies to those of the true values and through a density visualization of the distributions. The variance is rather more straightforward as we can find the statistical variance as determined by the classical formula for this quantity.
+
+## The Four Strategies
+
+### Censorship
+
+In this strategy, which is very commonly applied when laboratories confront results of assays that do not indicate numerical values, simply removes those cases from the study.
+
+When we do that here, we throw away `r numbdl` cases, meaning `r 100 * numbdl/n`% of the cases, which likely contain many other nuggets of useful information. Before we even arrive at judging bias and variance, this reckless disposal of worthwhile information is the principal defect of the strategy. This dataset is not arbitrarily skewed toward having cases with BDL viral load after 48 weeks. As pointed out at the beginning, many studies show results in the range of 85%.
+
+```{r}
+
+#| label: censorship
+
+censordf <- vldf |> 
+  filter(w48_bdl != "bdl")
+
+wk48_compare <- wk48_compare |> 
+  add_case(strategy = "censor",
+           mean_wk48 = mean(censordf$w48),
+           sd_wk48 = sd(censordf$w48),
+           var_wk48 = sd_wk48^2,
+           med_wk48 = median(censordf$w48),
+           num = nrow(censordf))
+
+wk48_compare |> 
+  gt() |> 
+  cols_label(
+    strategy = "Strategy",
+    mean_wk48 = "Mean",
+    sd_wk48 = "Std. Dev.",
+    var_wk48 = "Variance",
+    med_wk48 = "Median",
+    num = "# of Cases"
+  ) |> 
+  fmt_number(
+    columns = c(mean_wk48, sd_wk48, var_wk48),
+    decimals = 2
+  ) |> 
+  tab_spanner(
+    label = "Week 48 Viral Load",
+    columns = c(mean_wk48:num)
+  )
+
 
 ```
