@@ -100,7 +100,7 @@ vldf |>
               fill = palettes$jim_palette_1[1],
               title = "Viral Load Baseline Values - Simulated",
               add = "mean",
-              add.params = list(color = palettes$jim_palette_1[2], size = 2),
+              add.params = list(color = palettes$jim_palette_1[2], size = 1.2),
               xlab = "Viral Load",
               ylab = "Count",
               ggtheme = theme_bw()) +
@@ -133,7 +133,7 @@ vldf |>
               fill = palettes$jim_palette_1[1],
               title = "Viral Load Week 48 Values",
               add = "mean",
-              add.params = list(color = palettes$jim_palette_1[2], size = 2),
+              add.params = list(color = palettes$jim_palette_1[2], size = 1.2),
               xlab = "Viral Load",
               ylab = "Count",
               ggtheme = theme_bw()) +
@@ -175,6 +175,18 @@ vldf |>
 
 # store number of bdl's for text below
 numbdl <- length(vldf$w48_bdl[vldf$w48_bdl == "bdl"])
+
+vldf |> 
+  ggdensity(x = "w48",
+            fill = palettes$jim_palette_1[1],
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density of True Value Viral Load",
+            add = "mean",
+            add.params = list(size = 1.2, color = "black"),
+            xlim = c(0, 110),
+            ggtheme = theme_bw()) +
+  annotate("text", x = 40, y = .04, label = "Mean True", color = "black")
 ```
 
 ## Bias and Variance
@@ -197,7 +209,7 @@ censordf <- vldf |>
   filter(w48_bdl != "bdl")
 
 wk48_compare <- wk48_compare |> 
-  add_case(strategy = "censor",
+  add_case(strategy = "censored",
            mean_wk48 = mean(censordf$w48),
            sd_wk48 = sd(censordf$w48),
            var_wk48 = sd_wk48^2,
@@ -223,5 +235,22 @@ wk48_compare |>
     columns = c(mean_wk48:num)
   )
 
-
+censordf |> 
+  ggdensity(x = "w48",
+            fill = palettes$jim_palette_1[1],
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density of Censored Viral Load",
+            xlim = c(0, 110),
+            ggtheme = theme_bw()) +
+  geom_vline(xintercept = mean(censordf$w48), size = 1.2, color = "black") +
+  annotate("text", x = 75, y = .06, label = "Mean Censored", color = "black") +
+  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = "black") +
+  annotate("text", x = 40, y = .04, label = "Mean True", color = "black")
 ```
+
+As you can see from the table and the density graph, the mean of the censored viral loads at 48 weeks is more than twice the true value as is the median value. That is because all values less than 50 were removed from the dataset because we did not know their true value; they were "BDL". The censorship strategy leaves a highly biased dataset. The variance is greatly reduced, approximately a third the variance of the true values. Again, this is due to censoring–eliminating values within a certain range. Here the eliminated range is from the lowest value among the true values (`r  min(vldf$w48)`) up to 49.
+
+### Treat as 0
+
+###  
