@@ -49,7 +49,12 @@ What is the relationship between the true value of viral load below detection li
 #| echo: false
 
 pacman::p_load(tidyverse, janitor, ggpubr, ggsci, gt, summarytools)
-palettes <- readRDS("/Users/jameshunter/Documents/R/jim_palettes.rds")
+
+uchicago <- pal_uchicago(palette = "default")(8)
+crimson <- uchicago[7]
+gray <- uchicago[2]
+blue <- uchicago[5]
+green <- uchicago[8]
 stats <- c("mean", "sd", "min", "med", "max", "iqr", "cv")
 
 ## assumed values
@@ -97,15 +102,15 @@ vldf <- tibble(bl)
 vldf |> 
   gghistogram(x = "bl",
               bins = 20,
-              fill = palettes$jim_palette_1[1],
+              fill = crimson,
               title = "Viral Load Baseline Values - Simulated",
               add = "mean",
-              add.params = list(color = palettes$jim_palette_1[2], size = 1.2),
+              add.params = list(color = gray, size = 1.2),
               xlab = "Viral Load",
               ylab = "Count",
               ggtheme = theme_bw()) +
   annotate("text", x = 1800, y = 125, label = "Mean of Viral Loads", 
-           color = palettes$jim_palette_1[2])
+           color = gray)
 ```
 
 ## Week 48 Viral Load
@@ -130,15 +135,15 @@ descr(vldf$w48, stats = stats)
 vldf |> 
   gghistogram(x = "w48",
               bins = 20,
-              fill = palettes$jim_palette_1[1],
+              fill = crimson,
               title = "Viral Load Week 48 Values",
               add = "mean",
-              add.params = list(color = palettes$jim_palette_1[2], size = 1.2),
+              add.params = list(color = gray, size = 1.2),
               xlab = "Viral Load",
               ylab = "Count",
               ggtheme = theme_bw()) +
   annotate("text", x = 50, y = 110, label = "Mean of Viral Loads", 
-           color = palettes$jim_palette_1[2])
+           color = gray)
 # tibble to compare true values with strategies
 wk48_compare <- vldf |> 
   summarise(
@@ -178,7 +183,7 @@ numbdl <- length(vldf$w48_bdl[vldf$w48_bdl == "bdl"])
 
 vldf |> 
   ggdensity(x = "w48",
-            fill = palettes$jim_palette_1[1],
+            fill = crimson,
             xlab = "Viral Load",
             ylab = "Density",
             title = "Density of True Value Viral Load",
@@ -235,18 +240,23 @@ wk48_compare |>
     columns = c(mean_wk48:num)
   )
 
-censordf |> 
-  ggdensity(x = "w48",
-            fill = palettes$jim_palette_1[1],
+ggcensor <- tibble(true = vldf$w48,
+                   censored = c(censordf$w48, rep(NA, num_vals_bdl))) |> 
+  pivot_longer(cols = everything(), names_to = "Strategy", values_to = "vl")|> 
+  ggdensity(x = "vl",
+            palette = "uchicago",
+            color = "Strategy",
+            fill = "Strategy",
             xlab = "Viral Load",
             ylab = "Density",
             title = "Density of Censored Viral Load",
             xlim = c(0, 110),
             ggtheme = theme_bw()) +
-  geom_vline(xintercept = mean(censordf$w48), size = 1.2, color = "black") +
-  annotate("text", x = 75, y = .06, label = "Mean Censored", color = "black") +
-  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = "black") +
-  annotate("text", x = 40, y = .04, label = "Mean True", color = "black")
+  geom_vline(xintercept = mean(censordf$w48), size = 1.2, color = blue) +
+  annotate("text", x = 75, y = .06, label = "Mean Censored", color = blue) +
+  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = green) +
+  annotate("text", x = 40, y = .04, label = "Mean True", color = green)
+ggcensor
 ```
 
 As you can see from the table and the density graph, the mean of the censored viral loads at 48 weeks is more than twice the true value as is the median value. That is because all values less than 50 were removed from the dataset because we did not know their true value; they were "BDL". The censorship strategy leaves a highly biased dataset. The variance is greatly reduced, approximately a third the variance of the true values. Again, this is due to censoring–eliminating values within a certain range. Here the eliminated range is from the lowest value among the true values (`r  min(vldf$w48)`) up to 49.
@@ -291,18 +301,23 @@ wk48_compare |>
     columns = c(mean_wk48:num)
   )
 
-go_zero |> 
-  ggdensity(x = "zero_w48",
-            fill = palettes$jim_palette_1[1],
+gg_gozero  <- tibble(true = vldf$w48,
+                     gozero = go_zero$zero_w48) |> 
+  pivot_longer(cols = everything(), names_to = "Strategy", values_to = "vl")|> 
+  ggdensity(x = "vl",
+            palette = "uchicago",
+            color = "Strategy",
+            fill = "Strategy",
             xlab = "Viral Load",
             ylab = "Density",
             title = "Density of Zeroed Viral Load",
             xlim = c(0, 110),
             ggtheme = theme_bw()) +
-  geom_vline(xintercept = mean(go_zero$zero_w48), size = 1.2, color = "black") +
-  annotate("text", x = 20, y = .06, label = "Mean Zeroed", color = "black") +
-  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = "black") +
-  annotate("text", x = 40, y = .04, label = "Mean True", color = "black")
+  geom_vline(xintercept = mean(go_zero$zero_w48), size = 1.2, color = blue) +
+  annotate("text", x = 20, y = .06, label = "Mean Zeroed", color = blue) +
+  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = green) +
+  annotate("text", x = 40, y = .04, label = "Mean True", color = green)
+gg_gozero
 ```
 
 Here, the mean of the distribution now reflects the `r num_vals_bdl` cases that have viral loads that cannot be accurately measured. Although we know that if we had been able to measure these values, they would have produced a mean of `r wk48_compare$mean_wk48[1]` and a variance of `r wk48_compare$var_wk48[1]`. However, because of the huge numbers of false zeros that have been inserted, the mean has now fallen to `wk48_compare$mean_wk48[3]`. Because there are now the mass of zero values and a lesser number of high values, with few in the middle (the trough of the graph on the density graph), the variance has increased to `r wk48_compare$var_wk48[3]` . Since the zero values represent such a large portion of the dataset, the median has fallen to 0.
