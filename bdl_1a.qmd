@@ -132,6 +132,9 @@ vldf <- vldf |>
 
 descr(vldf$w48, stats = stats)
 
+# true value of wk48 mean
+true_mean <- mean(vldf$w48)
+
 vldf |> 
   gghistogram(x = "w48",
               bins = 20,
@@ -148,11 +151,38 @@ vldf |>
 wk48_compare <- vldf |> 
   summarise(
     strategy = "true",
-    mean_wk48 = mean(w48),
+    mean_wk48 = true_mean,
+    diff = 0.0,
     sd_wk48 = sd(w48),
     var_wk48 = sd_wk48^2,
     med_wk48 = median(w48),
-    num = n())
+    num = n(), 
+    cv = sd_wk48/mean_wk48)
+
+
+# function for showing compare week 48 table
+compare_strat_table <- function() {
+  wk48_compare |> 
+  gt() |> 
+  cols_label(
+    strategy = "Strategy",
+    diff = "Diff True Mean",
+    mean_wk48 = "Mean",
+    sd_wk48 = "Std. Dev.",
+    var_wk48 = "Variance",
+    med_wk48 = "Median",
+    num = "# of Cases",
+    cv = "Coeffient Var."
+  ) |> 
+  fmt_number(
+    columns = c(mean_wk48, diff, sd_wk48, var_wk48, cv),
+    decimals = 2
+  ) |> 
+  tab_spanner(
+    label = "Week 48 Viral Load",
+    columns = c(mean_wk48:num)
+  )
+}
 ```
 
 To give you an idea of what we have now, here are the first 10 cases in our dataset. While we know the true values of the viral load, the assay itself will only give us a BDL signal instead of the value. This occurs `r num_vals_bdl` times out of the 1,000 cases. The question is what can we do about it and what does that do to the distribution of viral loads that we are trying to use to make an inference about HIV-1 treatment strategies.
@@ -216,29 +246,14 @@ censordf <- vldf |>
 wk48_compare <- wk48_compare |> 
   add_case(strategy = "censored",
            mean_wk48 = mean(censordf$w48),
+           diff = mean_wk48 - true_mean,
            sd_wk48 = sd(censordf$w48),
            var_wk48 = sd_wk48^2,
            med_wk48 = median(censordf$w48),
-           num = nrow(censordf))
+           num = nrow(censordf), 
+           cv = sd_wk48/mean_wk48)
 
-wk48_compare |> 
-  gt() |> 
-  cols_label(
-    strategy = "Strategy",
-    mean_wk48 = "Mean",
-    sd_wk48 = "Std. Dev.",
-    var_wk48 = "Variance",
-    med_wk48 = "Median",
-    num = "# of Cases"
-  ) |> 
-  fmt_number(
-    columns = c(mean_wk48, sd_wk48, var_wk48),
-    decimals = 2
-  ) |> 
-  tab_spanner(
-    label = "Week 48 Viral Load",
-    columns = c(mean_wk48:num)
-  )
+compare_strat_table()
 
 ggcensor <- tibble(true = vldf$w48,
                    censored = c(censordf$w48, rep(NA, num_vals_bdl))) |> 
@@ -277,29 +292,14 @@ go_zero <- vldf |>
 wk48_compare <- wk48_compare |> 
   add_case(strategy = "Zero",
            mean_wk48 = mean(go_zero$zero_w48),
+           diff = mean_wk48 - true_mean,
            sd_wk48 = sd(go_zero$zero_w48),
            var_wk48 = sd_wk48^2,
            med_wk48 = median(go_zero$zero_w48),
-           num = nrow(go_zero))
+           num = nrow(go_zero), 
+           cv = sd_wk48/mean_wk48)
 
-wk48_compare |> 
-  gt() |> 
-  cols_label(
-    strategy = "Strategy",
-    mean_wk48 = "Mean",
-    sd_wk48 = "Std. Dev.",
-    var_wk48 = "Variance",
-    med_wk48 = "Median",
-    num = "# of Cases"
-  ) |> 
-  fmt_number(
-    columns = c(mean_wk48, sd_wk48, var_wk48),
-    decimals = 2
-  ) |> 
-  tab_spanner(
-    label = "Week 48 Viral Load",
-    columns = c(mean_wk48:num)
-  )
+compare_strat_table()
 
 gg_gozero  <- tibble(true = vldf$w48,
                      gozero = go_zero$zero_w48) |> 
@@ -320,6 +320,52 @@ gg_gozero  <- tibble(true = vldf$w48,
 gg_gozero
 ```
 
-Here, the mean of the distribution now reflects the `r num_vals_bdl` cases that have viral loads that cannot be accurately measured. Although we know that if we had been able to measure these values, they would have produced a mean of `r wk48_compare$mean_wk48[1]` and a variance of `r wk48_compare$var_wk48[1]`. However, because of the huge numbers of false zeros that have been inserted, the mean has now fallen to `wk48_compare$mean_wk48[3]`. Because there are now the mass of zero values and a lesser number of high values, with few in the middle (the trough of the graph on the density graph), the variance has increased to `r wk48_compare$var_wk48[3]` . Since the zero values represent such a large portion of the dataset, the median has fallen to 0.
+Here, the mean of the distribution now reflects the `r num_vals_bdl` cases that have viral loads that cannot be accurately measured. Although we know that if we had been able to measure these values, they would have produced a mean of `r round(wk48_compare$mean_wk48[1],2)` and a variance of `r round(wk48_compare$var_wk48[1],2)`. However, because of the huge numbers of false zeros that have been inserted, the mean has now fallen to `r round(wk48_compare$mean_wk48[3],2)`. Because there are now the mass of zero values and a lesser number of high values, with few in the middle (the trough of the graph on the density graph), the variance has increased to `r round(wk48_compare$var_wk48[3],2)` . Since the zero values represent such a large portion of the dataset, the median has fallen to 0.
 
 Thus, while tempting, this strategy also distorts dramatically the true nature of the data and bases medical and research decision-making on a false premise.
+
+### Treat as Detection Limit
+
+Just as the prior strategy was optimistic, this strategy is pessimistic. In this strategy, we set all the BDL values to the detection limit itself, which we are setting at `r dl` copies for this analysis. However, it is similar in that it chooses a single, arbitrary value for all the BDL cases.
+
+This too distorts the underling true distribution of viral loads.
+
+```{r}
+
+#| label: dl
+
+go_dl <- vldf |> 
+  mutate(dl_w48 = ifelse(w48_bdl == "bdl", dl, as.numeric(w48_bdl)))
+
+wk48_compare <- wk48_compare |> 
+  add_case(strategy = "Detection Limit",
+           mean_wk48 = mean(go_dl$dl_w48),
+           diff = mean_wk48 - true_mean,
+           sd_wk48 = sd(go_dl$dl_w48),
+           var_wk48 = sd_wk48^2,
+           med_wk48 = median(go_dl$dl_w48),
+           num = nrow(go_dl), 
+           cv = sd_wk48/mean_wk48)
+
+compare_strat_table()
+
+gg_godl  <- tibble(true = vldf$w48,
+                   detect_limit = go_dl$dl_w48) |> 
+  pivot_longer(cols = everything(), names_to = "Strategy", values_to = "vl")|> 
+  ggdensity(x = "vl",
+            palette = "uchicago",
+            color = "Strategy",
+            fill = "Strategy",
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density of Detection Limit Viral Load",
+            xlim = c(0, 110),
+            ggtheme = theme_bw()) +
+  geom_vline(xintercept = mean(go_dl$dl_w48), size = 1.2, color = blue) +
+  annotate("text", x = 68, y = .21, label = "Mean Detec. Limit", color = blue) +
+  geom_vline(xintercept = mean(vldf$w48), size = 1.2, color = green) +
+  annotate("text", x = 20, y = .16, label = "Mean True", color = green)
+gg_godl
+```
+
+As with the censoring strategy, substituting the detection limit for BDL pushes the distribution of viral loads into a narrow range around that detection limit. As can be seen in the table above, the mean and the median are very close together and the variance now is less than half that of censored strategy, the lowest previous value. While the mean of this strategy is closer to the mean of the true values than the censoring strategy (a difference of `r round(wk48_compare$diff[4], 2)` copies versus `r round(wk48_compare$diff[2], 2)` copies), the concentration of values around `r dl` copies limits the accuracy and utility of this strategy.
