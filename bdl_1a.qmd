@@ -456,7 +456,9 @@ skewness <- psych::skew(adl$value)
 
 ```
 
-While this form shows a single peak that resembles a normal distribution, it is skewed to the right (skewness = `r skewness`). This makes it not directly a normal distribution. The Gamma distribution is a family of distributions whose shape is determined by two parameters. Among the possible curves of the distribution are a number that appear similar to our viral load data. For our analysis, we will test the Normal, Gamma, and Uniform distributions. I am adding the Uniform distribution to our inquiry list so we can see what a distribution that definitely doesn't fit the data looks like. It doesn't fit the data as the Uniform distribution assumes that the probability that the variable will assume any individual value is equal to the probability of any other value. Therefore, no peaks possible. This is clearly not the case for our data.
+While this form shows a single peak that resembles a normal distribution, it is skewed to the right (skewness = `r skewness`). This makes it not directly a normal distribution. The Gamma distribution is a family of distributions whose shape is determined by two parameters. Among the possible curves of the distribution are a number that appear similar to our viral load data. For our analysis, we will test the Normal, Gamma, and Uniform distributions. I am adding the Uniform distribution to our inquiry list so we can see what a distribution that definitely doesn't fit the data looks like[^5].
+
+[^5]: The Uniform distribution doesn't fit the data as it assumes that the probability that the variable will assume any individual value is equal to the probability of any other value. Therefore, no peaks possible. This is clearly not the case for our data.
 
 ```{r}
 
@@ -466,13 +468,105 @@ library(fitdistrplus)
 
 # normal dist
 fit_norm <- fitdist(adl$value, "norm")
-summary(fit_norm)
 
 # gamma dist
 fit_gamma <- fitdist(adl$value, "gamma")
-summary(fit_gamma)
 
 # uniform dist
 fit_unif <- fitdist(adl$value, "unif")
-summary(fit_unif)
+
+# comparative fit
+gof <- gofstat(list(fit_norm, fit_gamma, fit_unif), 
+               fitnames = c("Normal", "Gamma", "Uniform"))
+# table of stats
+gof_df <- tibble(dist = c("Normal", "Gamma", "Uniform"),
+                 mle = c(fit_norm$loglik, fit_gamma$loglik, fit_unif$loglik),
+                 cvm = gof$cvm,
+                 aic = gof$aic)
+gof_df |> 
+  gt() |> 
+  cols_label(
+    dist = "Distribution",
+    mle = "log<br>Likelihood",
+    cvm = "Cramer-von Mises<br>Statistic",
+    aic = "Akaike's Information<br>Criterion",
+    .fn = md
+  ) |> 
+  tab_header(
+    title = "Goodness of Fit of Distributions"
+  )
+
+cdfcomp(list(fit_norm, fit_gamma, fit_unif), 
+        legendtext = c("Normal", "Gamma", "Uniform"))
+denscomp(list(fit_norm, fit_gamma, fit_unif), 
+         legendtext = c("Normal", "Gamma", "Uniform"))
+
 ```
+
+The table shows three evaluation criteria for the three distributions: Loglikelihood of the distribution fitting the empirical data, the result of the Cramer-von Mises one-sample test[@wikipediacontributors2025], and the Akaike's Information Criterion (AIC).[@motulsky2004] For the Loglikelihood test, the maximum value is what we are seeking. In the other two tests, the minimum value would suggest the best distribution to use.
+
+::: callout-tip
+Remember that the Loglikelihood values are all negative, so the maximum value is the one closest to 0.
+:::
+
+The graphs very clearly show how far away from the shape of the distribution is the Uniform model. The other two distributions are reasonably close to each other, but the Gamma distribution is slightly better both in the table and on the graphs.
+
+::: callout-note
+As a practical matter, I usually focus on the AIC to help me choose among models. Because of the simplicity in its calculation, it is a criterion that makes choosing relative strengths easy. The theory behind it is very much more complex than the calculation of it, but in terms of practical implementation, it makes sense to use.
+:::
+
+### Calculating New Values for BDL 
+
+So, we will use the Gamma distribution with the parameters specified by distribution fitting function (`fitdistrplus::fitdist()`) to calculate new values to replace those `r numbdl` values that are BDL. We will then test that distribution against the true values to see if this imputation of values approximates the true distribution better than the Half Detection Limit strategy.
+
+```{r}
+
+#| label: new_bdl_values
+
+# get parameters of gamma dist
+gamma_shape <- fit_gamma$estimate[1]
+gamma_rate <-  fit_gamma$estimate[2]
+
+# choose vector of new values between 1 and 50 according to lognorm distribution
+set.seed(1946)
+values <- rgamma(12000, shape = gamma_shape, rate = gamma_rate)
+values <- round(values[values < 50], 0)[1:n]
+
+vldf$w48_new <- numeric(length = n)
+for (i in 1:n) {
+  vldf$w48_new[i] <- ifelse(vldf$w48_bdl[i] == "bdl", values[i], vldf$w48[i])
+}
+
+wk48_compare <- wk48_compare |> 
+  add_case(strategy = "Imputed BDL Values",
+           mean_wk48 = mean(vldf$w48_new),
+           diff = mean_wk48 - true_mean,
+           sd_wk48 = sd(vldf$w48_new),
+           var_wk48 = sd_wk48^2,
+           med_wk48 = median(vldf$w48_new),
+           num = nrow(vldf), 
+           cv = sd_wk48/mean_wk48)
+
+compare_strat_table()
+
+# density plot
+gg_impute  <- tibble(true = vldf$w48,
+                     new = vldf$w48_new) |> 
+  pivot_longer(cols = everything(), names_to = "type", values_to = "vl")|> 
+  ggdensity(x = "vl",
+            palette = "uchicago",
+            color = "type",
+            fill = "type",
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density of True vs Imputed Values",
+            xlim = c(0, 110),
+            ggtheme = theme_bw()) +
+  geom_vline(xintercept = mean(vldf$w48_new), size = .8, color = blue) +
+  annotate("text", x = 51, y = .16, label = "Imputed BDL Values", color = blue) +
+  geom_vline(xintercept = mean(vldf$w48), size = .8, color = green) +
+  annotate("text", x = 20, y = .14, label = "Mean True", color = green)
+gg_impute
+```
+
+As both the graph and the last line of the table indicate, univariate imputation based on goodness-of-fit of the observed data (i.e, the data above detection limit) is not a good approximation of the true values originally shown. It is considerably worse than the Half Detection Limit strategy and involves much more work to achieve any result. As stated above, if the viral load or other variable subject to detection limits is part of a larger model with other variates that describe the clinical and virological state of the individuals, then MICE or another multiple imputation strategy may be desirable. This I will address in a later post.
