@@ -369,3 +369,110 @@ gg_godl
 ```
 
 As with the censoring strategy, substituting the detection limit for BDL pushes the distribution of viral loads into a narrow range around that detection limit. As can be seen in the table above, the mean and the median are very close together and the variance now is less than half that of censored strategy, the lowest previous value. While the mean of this strategy is closer to the mean of the true values than the censoring strategy (a difference of `r round(wk48_compare$diff[4], 2)` copies versus `r round(wk48_compare$diff[2], 2)` copies), the concentration of values around `r dl` copies limits the accuracy and utility of this strategy.
+
+### Treat as Half of the Detection Limit
+
+The final of these strategies that I have come across is that of treating the BDL values as one-half of the detection limit, in this case `r dl/2`. I'm not sure what the justification for this is beyond being a specific value somewhere between zero and the detection limit. As with the other strategies, this arbitrariness leads to considerable bias in calculations and then inferences related to viral load.
+
+```{r}
+
+#| label: half_dl
+
+half_dl <- vldf |> 
+  mutate(dl_w48 = ifelse(w48_bdl == "bdl", dl/2, as.numeric(w48_bdl)))
+
+wk48_compare <- wk48_compare |> 
+  add_case(strategy = "Half Detection Limit",
+           mean_wk48 = mean(half_dl$dl_w48),
+           diff = mean_wk48 - true_mean,
+           sd_wk48 = sd(half_dl$dl_w48),
+           var_wk48 = sd_wk48^2,
+           med_wk48 = median(half_dl$dl_w48),
+           num = nrow(half_dl), 
+           cv = sd_wk48/mean_wk48)
+
+compare_strat_table()
+
+gg_half_dl  <- tibble(true = vldf$w48,
+                   half_detect_limit = half_dl$dl_w48) |> 
+  pivot_longer(cols = everything(), names_to = "Strategy", values_to = "vl")|> 
+  ggdensity(x = "vl",
+            palette = "uchicago",
+            color = "Strategy",
+            fill = "Strategy",
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density of Half Detection Limit Viral Load",
+            xlim = c(0, 110),
+            ggtheme = theme_bw()) +
+  geom_vline(xintercept = mean(half_dl$dl_w48), size = .8, color = blue) +
+  annotate("text", x = 51, y = .16, label = "Mean Half Detec. Limit", color = blue) +
+  geom_vline(xintercept = mean(vldf$w48), size = .8, color = green) +
+  annotate("text", x = 20, y = .14, label = "Mean True", color = green)
+gg_half_dl
+
+```
+
+Empirically, this strategy does a relatively good job of estimating the distribution of the true values of the viral load distribution. The difference between the mean under this strategy and the true mean is very small (`r round(wk48_compare$diff[5])`). As with all the strategies that focus on a single value as a substitute for BDL, the density of the distribution is focused very narrowly around the half mean value with the only distant cluster being those viral loads that were greater than `r dl` initially. These appear as the concentration whose center is just below 60. This works well as the `r numbdl` values that are classed as BDL actually have a mean of `r round(mean(vldf$w48[vldf$w48 < 50]), 2)` , a value also extremely close to the assigned value of `r dl/2`. As the detection limit declines, this approximation will become even closer. So, in terms of distortion of the data, this strategy offers an acceptable practical solution.
+
+## Imputation of Values Below Detection Limit
+
+All of these four strategies have the defect of substituting a range of values by a single value, losing the variance inherent in what I have called here the true values. We are considering a single variable, isolated from covariates that describe the phenotype of the person whose viral load we are estimating. If we had a set of variables, we could estimate values for the censored BDL values using one of a number of systems of multiple imputation, such as multiple regression imputation, or multiple imputation by chained equations (MICE)[^3]. [@buuren2011]
+
+[^3]: In a later post, I will address some of these techniques applied to the problem of the machine limits in determining values for viral load and other assays of HIV-1.
+
+However, in the case that we simply have viral load to consider, the only way we can "fill in the blanks" of viral loads below detection limit is to determine the distribution that describes the data and estimate the parameters of that distribution. Knowing these quantities, we can estimate a series of random values to stand in for the missing BDL values. The process of estimating which of the many known statistical distributions the empirical data is closest to is well known. Various distribution estimating algorithms are available in R. In this discussion, I will focus on fitdistrplus which uses maximum likelihood (mle) optimization to settle on a set of parameters that best fit the empirical data provided[^4].[@delignette-muller2015]
+
+[^4]: mle is not the only optimization algorithm available in fitdistrplus. However, it is the one I will focus on here.
+
+::: callout-important
+Remember that although we know the true values of our artificial dataset that are below the detection limit of `r dl`, with real data, we will only have NA, BDL, or other indication that the machine could not produce a reliable value. So, we would be limited to working with only those values above the detection limit.
+:::
+
+### Determining the Distribution of the Original Values
+
+The process of choosing a "best fitting" distribution involves testing the fit of various known distributions (such as normal, uniform, gamma, etc.) against the known values of the dataset. To prepare for this, it would be useful to plot the values above `r dl` to see if it suggests any of the typical curves of distributions.
+
+```{r}
+
+#| label: adl_curve
+
+adl  <- as_tibble(vldf$w48[vldf$w48 >= 50])
+
+adl |> 
+  ggdensity(x = "value",
+            color = crimson,
+            fill = crimson,
+            xlab = "Viral Load",
+            ylab = "Density",
+            title = "Density Curve of Viral Load",
+            subtitle = "Above Detection Limit",
+            add = "mean",
+            add.params = list(color = blue, linetype = "solid"),
+            ggtheme = theme_bw()) +
+  annotate("text", x = 58, y = .16, label = "Mean", color = blue)
+
+skewness <- psych::skew(adl$value)
+
+```
+
+While this form shows a single peak that resembles a normal distribution, it is skewed to the right (skewness = `r skewness`). This makes it not directly a normal distribution. The Gamma distribution is a family of distributions whose shape is determined by two parameters. Among the possible curves of the distribution are a number that appear similar to our viral load data. For our analysis, we will test the Normal, Gamma, and Uniform distributions. I am adding the Uniform distribution to our inquiry list so we can see what a distribution that definitely doesn't fit the data looks like. It doesn't fit the data as the Uniform distribution assumes that the probability that the variable will assume any individual value is equal to the probability of any other value. Therefore, no peaks possible. This is clearly not the case for our data.
+
+```{r}
+
+#| label: fitting distributions
+
+library(fitdistrplus)
+
+# normal dist
+fit_norm <- fitdist(adl$value, "norm")
+summary(fit_norm)
+
+# gamma dist
+fit_gamma <- fitdist(adl$value, "gamma")
+summary(fit_gamma)
+
+# uniform dist
+fit_unif <- fitdist(adl$value, "unif")
+summary(fit_unif)
+```
